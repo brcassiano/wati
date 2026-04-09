@@ -68,3 +68,27 @@ class Settings(BaseSettings):
         default="INFO",
         validation_alias=AliasChoices("log_level", "WATI_LOG_LEVEL"),
     )
+
+    # Webhook server (prefix: WATI_)
+    webhook_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("webhook_enabled", "WATI_WEBHOOK_ENABLED"),
+    )
+    webhook_host: str = Field(
+        default="0.0.0.0",
+        validation_alias=AliasChoices("webhook_host", "WATI_WEBHOOK_HOST"),
+    )
+    webhook_port: int = Field(
+        default=8080,
+        validation_alias=AliasChoices("webhook_port", "WATI_WEBHOOK_PORT"),
+    )
+    webhook_path: str = Field(
+        default="/webhook/status",
+        validation_alias=AliasChoices("webhook_path", "WATI_WEBHOOK_PATH"),
+    )
+
+    # Slack notifications (no prefix — third-party service)
+    slack_webhook_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("slack_webhook_url", "SLACK_WEBHOOK_URL"),
+    )

@@ -25,13 +25,28 @@ async def async_main() -> None:
     audit = AuditLogger(api_mode=api_mode)
     agent = WatiAgent(settings, api_client, audit)
 
-    await chat_loop(
-        agent,
-        settings,
-        audit,
-        is_mock_fallback=is_mock_fallback,
-        api_version=api_version,
-    )
+    # Webhook server (optional background task)
+    webhook_task = None
+    if settings.webhook_enabled:
+        from wati_agent.webhook import start_webhook_server
+
+        webhook_task = asyncio.create_task(start_webhook_server(settings, audit))
+
+    try:
+        await chat_loop(
+            agent,
+            settings,
+            audit,
+            is_mock_fallback=is_mock_fallback,
+            api_version=api_version,
+        )
+    finally:
+        if webhook_task:
+            webhook_task.cancel()
+            try:
+                await webhook_task
+            except asyncio.CancelledError:
+                pass
 
 
 def main() -> None:

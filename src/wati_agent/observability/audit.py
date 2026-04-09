@@ -6,6 +6,7 @@ In-memory list for fast access during current session.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,11 @@ class AuditLogger:
         self._entries: list[AuditEntry] = []
         self._file = audit_file or audit_file_for_mode(api_mode)
         self._file.parent.mkdir(parents=True, exist_ok=True)
+        self._listeners: list[Callable[[AuditEntry], None]] = []
+
+    def add_listener(self, callback: Callable[[AuditEntry], None]) -> None:
+        """Register a callback invoked after each new entry is logged."""
+        self._listeners.append(callback)
 
     def log_action(
         self,
@@ -87,6 +93,8 @@ class AuditLogger:
         )
         self._entries.append(entry)
         self._persist(entry)
+        for listener in self._listeners:
+            listener(entry)
         self._log.info(
             "api_action",
             session_id=session_id,

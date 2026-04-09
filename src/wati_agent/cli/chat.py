@@ -173,9 +173,10 @@ def _print_audit_entries(entries: list, title: str = "Session Audit Trail") -> N
     table.add_column("Action", style="bold")
     table.add_column("Status", width=10)
     table.add_column("Duration", justify="right", width=8)
-    table.add_column("Details", no_wrap=False)
+    table.add_column("Details", no_wrap=False, min_width=40)
 
     message_actions = {"user_message", "agent_response"}
+    message_ids: list[tuple[str, str, str]] = []
     current_plan_id = None
     for e in entries:
         # Visual separator between plans
@@ -212,16 +213,22 @@ def _print_audit_entries(entries: list, title: str = "Session Audit Trail") -> N
 
         duration = f"{e.duration_ms:.0f}ms" if e.duration_ms else "-"
 
-        # Build details: params + message_id from result
+        # Build details: params (message_id tracked separately)
         details = _format_audit_details(e.params)
+        mid = None
         if e.result and isinstance(e.result, dict):
-            mid = e.result.get("message_id")
-            if mid:
-                details += f", message_id={mid}"
+            mid = e.result.get("message_id") or e.result.get("id")
+        if mid:
+            message_ids.append((time_str, e.action, mid))
 
         table.add_row(time_str, method, endpoint, e.action, status, duration, details)
 
     console.print(table)
+
+    if message_ids:
+        console.print("\n[bold]Message IDs[/bold] (for webhook testing):")
+        for ts, action, mid in message_ids:
+            console.print(f"  {ts}  {action}  [cyan]{mid}[/cyan]")
 
 
 def _print_help(dry_run: bool) -> None:
@@ -260,7 +267,11 @@ async def _execute_plan_batch(plan: ActionPlan, executor: PlanExecutor) -> bool:
     n = len(plan.steps)
     suffix = "s" if n > 1 else ""
     try:
-        answer = console.input(f"[bold]Confirm execution ({n} action{suffix})? [/bold]").strip()
+        answer = (
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: console.input(f"[bold]Confirm execution ({n} action{suffix})? [/bold]")
+            )
+        ).strip()
     except (EOFError, KeyboardInterrupt):
         answer = "n"
 
@@ -323,7 +334,11 @@ async def chat_loop(
 
     while True:
         try:
-            user_input = console.input("[bold green]> [/bold green]").strip()
+            user_input = (
+                await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: console.input("[bold green]> [/bold green]")
+                )
+            ).strip()
         except (EOFError, KeyboardInterrupt):
             agent._memory.save_session(session_id)
             console.print("\n[dim]Goodbye![/dim]")
